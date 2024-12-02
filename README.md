@@ -1,4 +1,4 @@
-# Icons Plus
+# Icons Plus for Statamic
 
 > Icons Plus is a fieldtype that leverages https://iconify.design to provide a searchable list of open source icons for use in your Statamic site.
 > Icons are stored both as a URL and SVG so they can be used as desired in templates.
