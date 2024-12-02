@@ -1,0 +1,37 @@
+{
+    "name": "twithers/icons-plus",
+    "autoload": {
+        "psr-4": {
+            "Twithers\\IconsPlus\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Twithers\\IconsPlus\\Tests\\": "tests"
+        }
+    },
+    "require": {
+        "statamic/cms": "^5.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "pixelfear/composer-dist-plugin": true
+        }
+    },
+    "extra": {
+        "statamic": {
+            "name": "Icons Plus",
+            "description": "Icons Plus fieldtype for Statamic. Uses the iconify.design library to provide a searchable list of icons."
+        },
+        "laravel": {
+            "providers": [
+                "Twithers\\IconsPlus\\ServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
