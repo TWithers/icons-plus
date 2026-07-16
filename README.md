@@ -16,6 +16,12 @@ You can install this addon via Composer:
 composer require twithers/icons-plus
 ```
 
+If you are using Statamic v5 or below, use version 1.1.0:
+``` bash
+composer require twithers/icons-plus:1.1.0
+```
+
+
 ## How to Use
 
 After adding the fieldtype to your blueprint, you can then store a selected icon.
