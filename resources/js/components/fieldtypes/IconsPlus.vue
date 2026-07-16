@@ -9,171 +9,140 @@
       <div v-else v-html="value.iconSvg" class="w-24 h-24"></div>
       <div class="text-center text-sm">{{ value.label }}</div>
     </div>
-    <v-select
+
+    <Combobox
         v-show="! value"
         ref="input"
         class="w-full"
         clearable
-        :name="name"
+        ignore-filter
         :disabled="config.disabled || isReadOnly"
-        :options="paginated"
+        :options="results"
         :placeholder="__(config.placeholder || 'Search...')"
         :searchable="true"
-        :value="value"
+        :model-value="null"
         :multiple="false"
-        :close-on-select="true"
-        :filterable="false"
-        @input="vueSelectUpdated"
-        @open="onOpen"
-        @close="onClose"
-        @search="onSearch"
-        @search:focus="$emit('focus')"
-        @search:blur="$emit('blur')">
-      <template v-slot:no-options class="col-span-3 text-center p-3">
-        <div v-show="searchTerm.length === 0" class="py-3">
+        @update:model-value="comboboxUpdated"
+        @search="onSearch">
+      <template #no-options>
+        <div v-if="loading" class="py-3 text-center italic text-gray-600 text-sm">
+          Loading icons...
+        </div>
+        <div v-else-if="searchTerm.length === 0" class="py-3 text-center">
           Type to search for icons!
         </div>
-        <div v-show="searchTerm.length !== 0" class="py-3">
+        <div v-else class="py-3 text-center">
           No results exist!
         </div>
-
       </template>
-      <template v-slot:option="option">
-        <div class="flex items-center justify-center flex-col">
-          <img :src='option.src' class="w-12 h-12"/>
-          {{ option.label }}
-        </div>
+      <template #option="option">
+        <img :src="option.src" class="size-7" />
+        <span v-text="option.label" />
       </template>
-      <template v-slot:list-footer>
-        <li v-show="hasNextPage" ref="loadMore" class="loader col-span-3 text-center italic text-gray-600 text-sm p-3" style="grid-column: span 3 / span 3;">
-          Loading more icons...
-        </li>
-      </template>
-    </v-select>
+    </Combobox>
   </div>
 </template>
 
 <script>
+import { FieldtypeMixin as Fieldtype } from '@statamic/cms';
+import { Combobox } from '@statamic/cms/ui';
+
+function debounce(fn, wait) {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), wait);
+  };
+}
 
 export default {
 
+  components: { Combobox },
+
   mixins: [Fieldtype],
+
   data() {
     return {
-      observer: null,
-      options: [],
       results: [],
-      limit: 30,
       searchTerm: '',
+      loading: false,
     }
   },
 
-  computed: {
-    selectedOption() {
-      return this.results?.find(option => option.value === this.value);
-    },
-    paginated() {
-      return this.results.slice(0, this.limit);
-    },
-    hasNextPage() {
-      return this.paginated.length < this.results.length;
-    }
-
-  },
-  mounted() {
-    this.observer = new IntersectionObserver(this.infiniteScroll);
-  },
-
-  methods: {
-    async onSearch(search, loading) {
-      this.searchTerm = search;
-      if (search.length) {
-        loading(true);
-        this.search(loading, search, this);
-      }
-    },
-    async onOpen() {
-      if (this.hasNextPage) {
-        await this.$nextTick()
-        this.observer.observe(this.$refs.loadMore)
-      }
-    },
-    onClose() {
-      this.observer.disconnect()
-    },
-    search: _.debounce(async (loading, search, vm) => {
-      vm.keyword = null;
+  created() {
+    this.debouncedSearch = debounce((search) => {
       const query = new URLSearchParams();
       query.set('query', search);
       query.set('limit', 999);
-      if (vm.config.icon_group_restrictions.length){
-        query.set('prefixes', vm.config.icon_group_restrictions.join(','));
+      if (this.config.icon_group_restrictions.length) {
+        query.set('prefixes', this.config.icon_group_restrictions.join(','));
       }
 
-      return fetch(
-          `https://api.iconify.design/search?${query.toString()}`
-      ).then(async (res) => {
-        res.json().then(json => {
-          vm.results = json.icons.map(i => ({
+      fetch(`https://api.iconify.design/search?${query.toString()}`)
+        .then(res => res.json())
+        .then(json => {
+          this.results = json.icons.map(i => ({
             src: `https://api.iconify.design/${i.split(':')[0]}/${i.split(':')[1]}.svg`,
             value: i,
             label: i,
-            icon: i,
           }));
-        }).then(async () => {
-          if (vm.hasNextPage) {
-            await vm.$nextTick()
-            vm.observer.observe(vm.$refs.loadMore)
-          }
+          this.loading = false;
         });
-        loading(false);
-      });
-    }, 350),
-    async infiniteScroll([{ isIntersecting, target }]) {
-      if (isIntersecting) {
-        const ul = target.offsetParent
-        const scrollTop = target.offsetParent.scrollTop
-        this.limit += 30
-        await this.$nextTick()
-        ul.scrollTop = scrollTop
+    }, 350);
+  },
+
+  methods: {
+    onSearch(search) {
+      this.searchTerm = search;
+
+      if (! search.length) {
+        this.loading = false;
+        this.results = [];
+        return;
       }
+
+      this.loading = true;
+      this.debouncedSearch(search);
     },
+
     focus() {
       this.$refs.input.focus();
     },
 
-    vueSelectUpdated(value) {
-      if (value) {
-        if (this.config.storage_options === 'both' || this.config.storage_options === 'url') {
-          this.update({
-            iconPrefix: value.value.split(":")[0],
-            iconName: value.value.split(":")[1],
-            iconUrl: value.src,
-            iconSvg: null,
-            label: value.value
-          });
-        }
-
-        if (this.config.storage_options === 'both' || this.config.storage_options === 'svg') {
-          fetch(`${value.src}?width=unset&height=unset`).then(res => res.text()).then(svg => {
-            this.update({
-              iconPrefix: value.value.split(":")[0],
-              iconName: value.value.split(":")[1],
-              iconUrl: (this.config.storage_options === 'both' ? value.src : null),
-              iconSvg: svg,
-              label: value.value
-            });
-          });
-        }
-      } else {
+    comboboxUpdated(value) {
+      if (! value) {
         this.update(null);
+        return;
+      }
+
+      const option = this.results.find(o => o.value === value);
+
+      if (! option) {
+        return;
+      }
+
+      if (this.config.storage_options === 'both' || this.config.storage_options === 'url') {
+        this.update({
+          iconPrefix: value.split(":")[0],
+          iconName: value.split(":")[1],
+          iconUrl: option.src,
+          iconSvg: null,
+          label: value
+        });
+      }
+
+      if (this.config.storage_options === 'both' || this.config.storage_options === 'svg') {
+        fetch(`${option.src}?width=unset&height=unset`).then(res => res.text()).then(svg => {
+          this.update({
+            iconPrefix: value.split(":")[0],
+            iconName: value.split(":")[1],
+            iconUrl: (this.config.storage_options === 'both' ? option.src : null),
+            iconSvg: svg,
+            label: value
+          });
+        });
       }
     },
   }
 };
 </script>
-<style lang="postcss">
-.icons-plus .vs__dropdown-menu {
-  @apply grid grid-cols-3 gap-2;
-}
-</style>

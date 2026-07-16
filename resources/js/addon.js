@@ -1,3 +1,5 @@
-import Fieldtype from './components/fieldtypes/IconsPlus.vue'
+import Fieldtype from './components/fieldtypes/IconsPlus.vue';
 
-Statamic.$components.register('icons_plus-fieldtype', Fieldtype)
+Statamic.booting(() => {
+    Statamic.$components.register('icons_plus-fieldtype', Fieldtype)
+});
